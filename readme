@@ -1,1 +1,527 @@
 
+LNG Ops Copilot
+
+Agentic AI Incident Analysis Assistant for LNG Operations
+
+LNG Ops Copilot is an end-to-end AI engineering project that demonstrates how Retrieval-Augmented Generation (RAG), agentic workflows, tool calling, and structured LLM outputs can be combined to support industrial operations teams during equipment incidents.
+
+The application accepts an equipment incident reported by an operator, retrieves relevant operating procedures and historical equipment information, and generates a structured troubleshooting response containing possible causes, recommended checks, confidence level, tools used, and supporting sources.
+
+Portfolio Project: This project uses simulated/local operational data and is intended to demonstrate an AI architecture for industrial operations. It does not use confidential or proprietary Shell operational data.
+
+Demo
+
+
+
+
+Example Incident
+
+Asset: Pump-14
+
+Operator query:
+
+Pump-14 shows overheating and vibration spikes during continuous operation. Has this happened before, and what should the operator check first?
+
+The copilot identifies possible causes such as coolant blockage and bearing wear, retrieves relevant SOPs and equipment history, and provides recommended checks with source traceability.
+
+Business Problem
+
+Industrial operations teams often need to diagnose equipment incidents using information distributed across multiple sources, such as:
+
+Standard Operating Procedures (SOPs)
+Maintenance records
+Equipment history
+Previous incident information
+
+During an operational incident, manually searching these sources can be slow and makes it difficult to rapidly correlate the current symptoms with previous equipment behaviour.
+
+A general-purpose LLM alone is also unsuitable for this type of workflow because it may generate plausible answers without grounding them in operational evidence.
+
+LNG Ops Copilot explores an alternative approach:
+
+LLM reasoning + RAG + tool calling + structured validation
+
+The objective is not to autonomously control equipment, but to provide an operator or engineer with source-backed decision support.
+
+Solution Overview
+
+Instead of sending an incident directly to an LLM, LNG Ops Copilot uses an agentic workflow.
+
+When an operator submits an incident, the system:
+
+Receives the asset ID and incident description.
+Determines which operational information is required.
+Searches relevant SOP documentation.
+Retrieves maintenance information where applicable.
+Retrieves historical information for the selected equipment.
+Provides the retrieved evidence to the LLM.
+Synthesizes the evidence into a structured troubleshooting response.
+Validates the output schema.
+Returns the response and evidence to the frontend.
+
+This allows the application to expose not only an answer, but also which tools and sources contributed to that answer.
+
+System Architecture
+                        LNG Ops Copilot
+
+                             Operator
+                                │
+                                ▼
+                    ┌─────────────────────┐
+                    │ React + TypeScript  │
+                    │      Frontend       │
+                    └──────────┬──────────┘
+                               │
+                         HTTP / REST
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      FastAPI        │
+                    │   POST /analyze     │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   LangGraph Agent   │
+                    │     Workflow        │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+                    ▼                     ▼
+             Retrieval Tools       Equipment Tools
+                    │                     │
+           ┌────────┴───────┐             │
+           ▼                ▼             ▼
+      SOP Retrieval    Maintenance     Equipment
+                         Records         History
+           │                │             │
+           └────────────┬───┴─────────────┘
+                        │
+                        ▼
+                Retrieved Context
+                        │
+                        ▼
+                 ┌───────────────┐
+                 │      LLM      │
+                 │   Synthesis   │
+                 └───────┬───────┘
+                         │
+                         ▼
+                 Pydantic Validation
+                         │
+                         ▼
+               Structured JSON Response
+                         │
+                         ▼
+                       UI
+Agentic AI Workflow
+
+The agent is designed as a multi-step workflow rather than a single LLM prompt.
+
+Conceptually:
+
+START
+  │
+  ▼
+Planner
+  │
+  ├───────────────┐
+  ▼               ▼
+Retrieve SOPs   Retrieve Logs
+  │               │
+  └───────┬───────┘
+          │
+          ▼
+ Retrieve Equipment History
+          │
+          ▼
+       Synthesis
+          │
+          ▼
+ Structured Validation
+          │
+          ▼
+         END
+
+The workflow separates retrieval, tool execution, reasoning, and response generation, making the behaviour easier to inspect and extend than a single large prompt.
+
+Tool Calling
+
+The agent can retrieve information through dedicated operational tools.
+
+search_sops
+
+Searches the local SOP knowledge base for procedures relevant to the reported symptoms.
+
+Example sources:
+
+pump_overheating_sop.txt
+vibration_response_sop.txt
+search_maintenance_logs
+
+Retrieves relevant maintenance information that can help determine whether similar problems or interventions have previously occurred.
+
+get_equipment_history
+
+Retrieves historical information associated with the selected asset.
+
+Example:
+
+equipment_history.json
+
+Separating these capabilities into tools allows the agent to retrieve information selectively instead of injecting the entire knowledge base into every prompt.
+
+Retrieval-Augmented Generation
+
+The application uses a RAG-style approach to ground the model in operational knowledge.
+
+Conceptually:
+
+Incident Query
+      │
+      ▼
+Operational Retrieval
+      │
+      ├── SOPs
+      ├── Maintenance Records
+      └── Equipment History
+      │
+      ▼
+Relevant Context
+      │
+      ▼
+LLM
+      │
+      ▼
+Grounded Troubleshooting Response
+
+This reduces reliance on the LLM's general knowledge and makes the answer more traceable to the information available to the application.
+
+Structured AI Response
+
+The model does not simply return unrestricted text.
+
+The backend expects a structured response containing fields such as:
+
+{
+  "summary": "...",
+  "possible_causes": [
+    "..."
+  ],
+  "recommended_checks": [
+    "..."
+  ],
+  "confidence": "Medium",
+  "tools_used": [
+    "search_sops",
+    "get_equipment_history"
+  ],
+  "sources": [
+    "pump_overheating_sop.txt",
+    "equipment_history.json"
+  ]
+}
+
+Pydantic validation is used to enforce the expected response structure before it is returned to the UI.
+
+This is particularly useful for enterprise AI applications because downstream systems can reliably consume structured fields instead of attempting to parse arbitrary LLM text.
+
+Example Output
+
+For an overheating and vibration incident involving Pump-14, the system can produce:
+
+Summary
+
+Pump-14 is experiencing overheating and vibration spikes that have been observed in previous cycles.
+
+Possible Causes
+Coolant blockage
+Bearing wear
+Recommended Checks
+Inspect the cooling line for blockages
+Check coolant filter condition
+Verify coolant circulation path
+Inspect for bearing wear and shaft alignment
+Confidence
+
+Medium
+
+Tools Used
+search_sops
+get_equipment_history
+Sources
+pump_overheating_sop.txt
+vibration_response_sop.txt
+equipment_history.json
+Technology Stack
+Layer	Technology
+Frontend	React
+Language	TypeScript
+API communication	Axios
+UI styling	Tailwind CSS
+Backend	FastAPI
+Backend language	Python
+API server	Uvicorn
+Agent orchestration	LangGraph
+LLM integration	OpenAI
+Data validation	Pydantic
+Knowledge retrieval	RAG-style document retrieval
+Operational knowledge	Local SOP and JSON datasets
+API style	REST
+Project Structure
+lng-ops-copilot/
+│
+├── backend/
+│   │
+│   ├── app.py
+│   ├── agent.py
+│   ├── tools/
+│   ├── data/
+│   │   ├── pump_overheating_sop.txt
+│   │   ├── vibration_response_sop.txt
+│   │   ├── maintenance_logs.json
+│   │   └── equipment_history.json
+│   │
+│   └── ...
+│
+├── frontend/
+│   ├── src/
+│   └── ...
+│
+├── docs/
+│   └── lng-ops-demo.png
+│
+├── .gitignore
+├── README.md
+└── ...
+
+The exact directory structure may vary as the project evolves.
+
+Backend API
+
+The FastAPI backend exposes the incident-analysis workflow to the frontend.
+
+Analyze Incident
+POST /analyze
+
+Example request:
+
+{
+  "asset_id": "Pump-14",
+  "incident_description": "Pump-14 shows overheating and vibration spikes during continuous operation."
+}
+
+The endpoint passes the incident through the agent workflow and returns the structured analysis to the frontend.
+
+FastAPI also provides interactive API documentation during local development:
+
+http://127.0.0.1:8000/docs
+Running the Project Locally
+1. Clone the repository
+git clone <repository-url>
+cd lng-ops-copilot
+2. Start the Backend
+
+Navigate to the backend:
+
+cd backend
+
+Create a Python virtual environment:
+
+python -m venv .venv
+
+Activate it on Windows:
+
+.venv\Scripts\activate
+
+Install dependencies:
+
+pip install -r requirements.txt
+
+Start FastAPI:
+
+uvicorn app:app --reload
+
+The backend should be available at:
+
+http://127.0.0.1:8000
+
+API documentation:
+
+http://127.0.0.1:8000/docs
+3. Start the Frontend
+
+Open another terminal:
+
+cd frontend
+
+Install dependencies:
+
+npm install
+
+Start the development server:
+
+npm run dev
+
+The frontend is typically available at:
+
+http://localhost:5173
+Design Principles
+Grounding Over Pure Generation
+
+Operational recommendations should be based on available evidence rather than solely on the LLM's pretrained knowledge.
+
+Tool-Based Access
+
+Operational information is exposed through tools so the agent can retrieve only the information required for the current incident.
+
+Structured Outputs
+
+Pydantic schemas provide a predictable interface between the LLM, backend, and frontend.
+
+Traceability
+
+The UI exposes both Tools Used and Sources, making it possible to understand where the generated analysis came from.
+
+Human-in-the-Loop Decision Support
+
+The copilot provides recommended checks rather than directly executing operational actions.
+
+Final operational decisions remain with qualified personnel.
+
+Why Agentic AI?
+
+A traditional RAG pipeline generally follows:
+
+Query → Retrieve → Generate
+
+Operational troubleshooting can require multiple information sources.
+
+The agentic approach extends the workflow to:
+
+Incident
+   ↓
+Determine required information
+   ↓
+Call relevant tools
+   ↓
+Collect evidence
+   ↓
+Reason across evidence
+   ↓
+Generate structured recommendation
+
+This makes the architecture suitable for future workflows involving additional operational tools and data sources.
+
+Safety and Reliability Considerations
+
+AI systems used around industrial operations require stronger controls than general-purpose chat applications.
+
+Important production considerations include:
+
+Human approval before operational actions
+Source attribution
+Role-based access control
+Audit logging
+Confidence thresholds
+Retrieval quality monitoring
+LLM output validation
+Data access controls
+Prompt-injection protection
+Observability and tracing
+Fallback behaviour when evidence is insufficient
+
+The current application is a portfolio prototype and demonstrates the architectural concepts rather than serving as a production control system.
+
+Current Scope
+
+The prototype currently demonstrates:
+
+Incident-based equipment troubleshooting
+SOP retrieval
+Historical equipment lookup
+Multi-step agent orchestration
+LLM-based synthesis
+Structured outputs
+Source traceability
+Confidence indication
+FastAPI integration
+React-based user interface
+
+The operational datasets used in the demonstration are simulated/local sample data.
+
+Future Enhancements
+
+Potential production-oriented extensions include:
+
+Vector database-based semantic retrieval
+Equipment telemetry integration
+Real-time sensor ingestion
+Time-series anomaly detection
+CMMS / maintenance-system integration
+Automated retrieval evaluation
+LLM observability and tracing
+Authentication and role-based authorization
+Containerized deployment
+Cloud deployment
+Human approval workflows
+Incident feedback loops
+Automated evaluation datasets
+
+A production implementation could also combine the agent with predictive-maintenance models so that both sensor anomalies and operational knowledge contribute to troubleshooting.
+
+What This Project Demonstrates
+
+This project demonstrates practical AI engineering concepts beyond basic LLM prompting:
+
+Agentic AI
+
+Multi-step orchestration
+Tool calling
+State-based workflows
+
+Generative AI
+
+LLM reasoning
+Grounded generation
+Structured outputs
+
+RAG
+
+Operational document retrieval
+Context grounding
+Source attribution
+
+Backend Engineering
+
+Python
+FastAPI
+REST APIs
+Pydantic validation
+
+Frontend Engineering
+
+React
+TypeScript
+API integration
+
+Enterprise AI Design
+
+Traceability
+Human-in-the-loop decision support
+Reliability considerations
+Extensible tool architecture
+Disclaimer
+
+This repository is an independent portfolio/demo project created to demonstrate AI engineering concepts for industrial operations.
+
+The equipment, incidents, SOPs, maintenance records, and operational data used by the application are simulated examples. The project does not contain or represent confidential operational data, proprietary procedures, or production systems belonging to Shell or any other LNG operator.
+
+Author
+
+Priya Deshpande
+
+AI / Data Science / Technical Product professional with experience across machine learning, predictive maintenance, enterprise integrations, RAG, and agentic AI systems.
+
+⭐ If you find the architecture useful, feel free to explore the repository and implementation.
