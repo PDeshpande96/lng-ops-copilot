@@ -1,0 +1,12 @@
+{
+    "Pump-14": {
+      "last_service_date": "2026-01-10",
+      "recurring_issues": ["coolant blockage", "bearing wear"],
+      "inspection_notes": "High vibration observed in two previous cycles."
+    },
+    "Pump-22": {
+      "last_service_date": "2026-02-03",
+      "recurring_issues": ["valve instability"],
+      "inspection_notes": "Pressure excursions linked to inconsistent valve calibration."
+    }
+  }

@@ -1,0 +1,3 @@
+Cooling System Checklist
+
+Verify coolant filter condition, line blockage, circulation pressure, and temperature stability. Escalate for mechanical review if repeated overheating occurs after filter replacement.

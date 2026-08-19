@@ -1,0 +1,3 @@
+Pump Overheating SOP
+
+If a pump shows overheating during sustained operation, first inspect the cooling line, filter blockage, and coolant circulation path. Review recent maintenance actions and compare with prior overheating incidents.

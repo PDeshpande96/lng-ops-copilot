@@ -1,0 +1,3 @@
+Vibration Response SOP
+
+If abnormal vibration is detected, inspect bearing wear, shaft alignment, and sensor drift. Compare current vibration readings against historical baselines before restarting equipment.
